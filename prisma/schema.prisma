@@ -1,0 +1,182 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  role      UserRole @default(user)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  uploads  Upload[]
+  reports  Report[]
+  usage    UsageLimit?
+
+  @@map("users")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+model Upload {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        UploadType
+  filename    String
+  mimeType    String    @map("mime_type")
+  storagePath String    @map("storage_path")
+  textHash    String    @map("text_hash")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime  @map("expires_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cvReports   Report[]  @relation("CVUpload")
+  jdReports   Report[]  @relation("JDUpload")
+
+  @@map("uploads")
+}
+
+enum UploadType {
+  cv
+  jd
+}
+
+model Report {
+  id             String         @id @default(uuid())
+  userId         String         @map("user_id")
+  cvUploadId     String         @map("cv_upload_id")
+  jdUploadId     String         @map("jd_upload_id")
+  combinedHash   String         @map("combined_hash")
+  overallScore   Int            @map("overall_score")
+  recommendation Recommendation
+  strategyJson   Json           @map("strategy_json")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cvUpload   Upload          @relation("CVUpload", fields: [cvUploadId], references: [id])
+  jdUpload   Upload          @relation("JDUpload", fields: [jdUploadId], references: [id])
+  metrics    ReportMetric[]
+  gapMap     ReportGapMap[]
+  checklist  ReportChecklist[]
+
+  @@map("reports")
+}
+
+enum Recommendation {
+  apply
+  consider
+  not_fit
+}
+
+model ReportMetric {
+  id           String   @id @default(uuid())
+  reportId     String   @map("report_id")
+  metricKey    String   @map("metric_key")
+  score        Int
+  weight       Int
+  findingsJson Json     @map("findings_json")
+  adviceJson   Json     @map("advice_json")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_metrics")
+}
+
+model ReportGapMap {
+  id                   String      @id @default(uuid())
+  reportId             String      @map("report_id")
+  groupKey             GapGroup    @map("group_key")
+  requirementText      String      @map("requirement_text")
+  priority             GapPriority
+  status               GapStatus
+  evidenceSnippet      String?     @map("evidence_snippet")
+  gapReason            String?     @map("gap_reason")
+  suggestedSection     String?     @map("suggested_section")
+  rewriteTemplatesJson Json        @map("rewrite_templates_json")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_gap_map")
+}
+
+enum GapGroup {
+  must_have
+  responsibilities
+  tools
+}
+
+enum GapPriority {
+  high
+  med
+  low
+}
+
+enum GapStatus {
+  FOUND
+  PARTIAL
+  MISSING
+}
+
+model ReportChecklist {
+  id        String   @id @default(uuid())
+  reportId  String   @map("report_id")
+  itemKey   String   @map("item_key")
+  labelVi   String   @map("label_vi")
+  labelEn   String   @map("label_en")
+  isDone    Boolean  @default(false) @map("is_done")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_checklist")
+}
+
+model UsageLimit {
+  userId      String @map("user_id")
+  monthYyyymm String @map("month_yyyymm")
+  usedCount   Int    @default(0) @map("used_count")
+  limitCount  Int    @default(10) @map("limit_count")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, monthYyyymm])
+  @@map("usage_limits")
+}
+
+model AdminFaq {
+  id           String   @id @default(uuid())
+  qVi          String   @map("q_vi")
+  aVi          String   @map("a_vi")
+  qEn          String   @map("q_en")
+  aEn          String   @map("a_en")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admin_faq")
+}
+
+model AdminTestimonial {
+  id           String   @id @default(uuid())
+  name         String
+  titleVi      String   @map("title_vi")
+  titleEn      String   @map("title_en")
+  quoteVi      String   @map("quote_vi")
+  quoteEn      String   @map("quote_en")
+  avatarUrl    String?  @map("avatar_url")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admin_testimonials")
+}
